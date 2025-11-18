@@ -8,19 +8,13 @@ import 'widgets/control_buttons.dart';
 import 'services/notification_service.dart';
 import 'services/audio_service.dart';
 import 'pages/settings_page.dart';
+import 'pages/tasks_page.dart';
+import 'state/tasks_notifier.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initializeNotifications();
   await AudioService.initialize();
-
-  // Debug: Test audio service after initialization
-  if (kDebugMode) {
-    print('🔧 DEBUG: Testing audio service in 3 seconds...');
-    Future.delayed(const Duration(seconds: 3), () {
-      AudioService.testAlarm();
-    });
-  }
 
   // Lock the app to portrait orientation only
   await SystemChrome.setPreferredOrientations([
@@ -166,8 +160,39 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Empty space for symmetry
-            SizedBox(width: 40.w),
+            // Tasks button
+            Container(
+              width: 40.w,
+              height: 40.h,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1.w,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20.r),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TasksPage(),
+                      ),
+                    );
+                  },
+                  child: Icon(
+                    Icons.assignment_outlined,
+                    color: Colors.white.withOpacity(0.7),
+                    size: 20.sp,
+                  ),
+                ),
+              ),
+            ),
             // Title
             Expanded(
               child: Text(
@@ -217,26 +242,34 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           ],
         ),
         SizedBox(height: 16.h),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(20.r),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.1),
-              width: 1.w,
-            ),
-          ),
-          child: Text(
-            '💡 25 minutes of deep focus',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
+        // Current Task Display
+        Consumer(
+          builder: (context, ref, _) {
+            final currentTask = ref.watch(currentTaskProvider);
+            return Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1.w,
+                ),
+              ),
+              child: Text(
+                currentTask != null
+                    ? '🎯 Current: ${currentTask.title}'
+                    : '💡 25 minutes of deep focus',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

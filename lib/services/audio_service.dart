@@ -188,19 +188,6 @@ class AudioService {
     }
   }
 
-  // Test alarm sound (for debugging)
-  static Future<void> testAlarm() async {
-    if (kDebugMode) {
-      print('🧪 Testing alarm sound...');
-      await playAlarmSound();
-
-      // Stop test alarm after 5 seconds
-      Future.delayed(const Duration(seconds: 5), () {
-        stopAlarmSound();
-      });
-    }
-  }
-
   // Check if alarm is currently playing
   static bool isAlarmPlaying() {
     return _isPlaying;

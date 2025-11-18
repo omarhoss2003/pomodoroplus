@@ -8,6 +8,8 @@ import 'widgets/control_buttons.dart';
 import 'services/notification_service.dart';
 import 'services/audio_service.dart';
 import 'pages/settings_page.dart';
+import 'pages/tasks_page.dart';
+import 'state/tasks_notifier.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -246,23 +248,72 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Focus • Flow • Achieve',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.6),
-                  letterSpacing: 1.5.w,
-                ),
+              Row(
+                children: [
+                  // Tasks button
+                  Container(
+                    width: 32.w,
+                    height: 32.h,
+                    margin: EdgeInsets.only(right: 12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1.w,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16.r),
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TasksPage(),
+                            ),
+                          );
+                        },
+                        child: Icon(
+                          Icons.assignment_outlined,
+                          color: Colors.white.withOpacity(0.7),
+                          size: 16.sp,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Focus • Flow • Achieve',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.6),
+                        letterSpacing: 1.5.w,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 4.h),
-              Text(
-                '💡 25 minutes of deep focus',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.5),
-                ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final currentTask = ref.watch(currentTaskProvider);
+                  return Text(
+                    currentTask != null
+                        ? '🎯 ${currentTask.title}'
+                        : '💡 25 minutes of deep focus',
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
               ),
             ],
           ),
