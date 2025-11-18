@@ -22,7 +22,7 @@ A modern Flutter-based Pomodoro timer app to boost productivity and manage work 
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/pomodoroplus.git
+   git clone https://github.com/omarhoss2003/pomodoroplus.git
    cd pomodoroplus
    ```
 
