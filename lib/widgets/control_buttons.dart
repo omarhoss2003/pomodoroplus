@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../state/pomodoro_notifier.dart';
 import '../models/pomodoro_state.dart';
 import '../services/audio_service.dart';
@@ -48,6 +47,14 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
   Widget build(BuildContext context) {
     final pomodoroState = ref.watch(pomodoroProvider);
     final pomodoroNotifier = ref.read(pomodoroProvider.notifier);
+    final isAlarmPlaying = ref.watch(alarmStateProvider);
+
+    // Calculate scale factor based on screen size
+    final screenWidth = MediaQuery.of(context).size.width;
+    final scaleFactor = (screenWidth / 320).clamp(
+      1.0,
+      2.2,
+    ); // Base width 320dp, scale between 1.0x and 2.2x
 
     return Column(
       children: [
@@ -62,18 +69,22 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
             children: [
               // Start/Pause Button
               Expanded(
-                child: _buildMainActionButton(pomodoroState, pomodoroNotifier),
+                child: _buildMainActionButton(
+                  pomodoroState,
+                  pomodoroNotifier,
+                  scaleFactor,
+                ),
               ),
-              SizedBox(width: 16.w),
+              SizedBox(width: 16 * scaleFactor),
               // Reset Button - same size as main button
-              Expanded(child: _buildResetButton(pomodoroNotifier)),
+              Expanded(child: _buildResetButton(pomodoroNotifier, scaleFactor)),
             ],
           ),
         ),
-        SizedBox(height: 24.h),
+        SizedBox(height: 24 * scaleFactor),
 
-        // Skip button - smaller
-        _buildSkipButton(pomodoroNotifier),
+        // Skip button - changes to Stop Alarm when alarm is playing
+        _buildSkipButton(pomodoroNotifier, scaleFactor, isAlarmPlaying),
       ],
     );
   }
@@ -81,6 +92,7 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
   Widget _buildMainActionButton(
     PomodoroState state,
     PomodoroNotifier notifier,
+    double scaleFactor,
   ) {
     final isRunning = state.isRunning;
     final isPaused = state.isPaused;
@@ -91,9 +103,9 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
         return Transform.scale(
           scale: 1.0 - (_mainButtonController.value * 0.05),
           child: Container(
-            height: 60.h,
+            height: 60 * scaleFactor,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30.r),
+              borderRadius: BorderRadius.circular(30 * scaleFactor),
               gradient: LinearGradient(
                 colors: isRunning
                     ? [const Color(0xFFFF8A65), const Color(0xFFFF7043)]
@@ -117,7 +129,7 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(30.r),
+                borderRadius: BorderRadius.circular(30 * scaleFactor),
                 onTap: () {
                   HapticFeedback.mediumImpact();
                   _mainButtonController.forward().then((_) {
@@ -140,16 +152,18 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
                         color: Colors.white,
-                        size: 24.sp,
+                        size: 24 * scaleFactor,
                       ),
-                      SizedBox(width: 12.w),
+                      SizedBox(
+                        width: 8 * scaleFactor,
+                      ), // Reduced spacing to move text closer to icon
                       Text(
                         isRunning ? 'Pause' : (isPaused ? 'Resume' : 'Start'),
                         style: TextStyle(
-                          fontSize: 18.sp,
+                          fontSize: 18 * scaleFactor,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          letterSpacing: 0.5.w,
+                          letterSpacing: 0.5 * scaleFactor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -164,16 +178,16 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
     );
   }
 
-  Widget _buildResetButton(PomodoroNotifier notifier) {
+  Widget _buildResetButton(PomodoroNotifier notifier, double scaleFactor) {
     return AnimatedBuilder(
       animation: _resetButtonController,
       builder: (context, child) {
         return Transform.scale(
           scale: 1.0 - (_resetButtonController.value * 0.05),
           child: Container(
-            height: 60.h, // Same height as main button
+            height: 60 * scaleFactor, // Same height as main button
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30.r),
+              borderRadius: BorderRadius.circular(30 * scaleFactor),
               color: Colors.white.withOpacity(0.1),
               border: Border.all(
                 color: Colors.white.withOpacity(0.2),
@@ -183,7 +197,7 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(30.r),
+                borderRadius: BorderRadius.circular(30 * scaleFactor),
                 onTap: () {
                   HapticFeedback.lightImpact();
                   _resetButtonController.forward().then((_) {
@@ -199,17 +213,21 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
                       Icon(
                         Icons.refresh_rounded,
                         color: Colors.white.withOpacity(0.9),
-                        size: 24.sp, // Same icon size as main button
+                        size: 24 * scaleFactor, // Same icon size as main button
                       ),
-                      SizedBox(width: 12.w), // Same spacing as main button
+                      SizedBox(
+                        width: 12 * scaleFactor,
+                      ), // Same spacing as main button
                       Text(
                         'Reset',
                         style: TextStyle(
-                          fontSize: 18.sp, // Same font size as main button
+                          fontSize:
+                              18 * scaleFactor, // Same font size as main button
                           fontWeight:
                               FontWeight.w700, // Same weight as main button
                           color: Colors.white.withOpacity(0.9),
-                          letterSpacing: 0.5.w, // Same letter spacing
+                          letterSpacing:
+                              0.5 * scaleFactor, // Same letter spacing
                         ),
                       ),
                     ],
@@ -223,69 +241,87 @@ class _ControlButtonsState extends ConsumerState<ControlButtons>
     );
   }
 
-  Widget _buildSkipButton(PomodoroNotifier notifier) {
+  Widget _buildSkipButton(
+    PomodoroNotifier notifier,
+    double scaleFactor,
+    bool isAlarmPlaying,
+  ) {
     return AnimatedBuilder(
       animation: _skipButtonController,
       builder: (context, child) {
         return Transform.scale(
           scale: 1.0 - (_skipButtonController.value * 0.03),
           child: Container(
-            height: 48.h, // Smaller than main buttons
+            height: 48 * scaleFactor, // Smaller than main buttons
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24.r),
+              borderRadius: BorderRadius.circular(24 * scaleFactor),
               border: Border.all(
-                color: Colors.white.withOpacity(0.15),
+                color: isAlarmPlaying
+                    ? Colors.red.withOpacity(0.3)
+                    : Colors.white.withOpacity(0.15),
                 width: 1,
               ),
+              gradient: isAlarmPlaying
+                  ? LinearGradient(
+                      colors: [
+                        Colors.red.withOpacity(0.2),
+                        Colors.red.withOpacity(0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(24.r),
+                borderRadius: BorderRadius.circular(24 * scaleFactor),
                 onTap: () {
                   HapticFeedback.selectionClick();
                   _skipButtonController.forward().then((_) {
                     _skipButtonController.reverse();
                   });
 
-                  // Check if alarm is playing and stop it
-                  if (AudioService.isAlarmPlaying()) {
-                    AudioService.stopAlarmSound();
+                  if (isAlarmPlaying) {
+                    // Stop the alarm
+                    AudioService.stopAlarmSound(
+                      onStop: () {
+                        ref.read(alarmStateProvider.notifier).state = false;
+                      },
+                    );
                   } else {
+                    // Skip to next phase
                     notifier.skipToNextPhase();
                   }
                 },
-                onLongPress: () {
-                  // Debug: Test alarm sound on long press
-                  HapticFeedback.heavyImpact();
-                  AudioService.testAlarm();
-                },
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: 20.w,
-                    vertical: 12.h,
+                    horizontal: 20 * scaleFactor,
+                    vertical: 12 * scaleFactor,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        AudioService.isAlarmPlaying()
-                            ? Icons.volume_off_rounded
+                        isAlarmPlaying
+                            ? Icons.stop_rounded
                             : Icons.skip_next_rounded,
-                        color: Colors.white.withOpacity(0.7),
-                        size: 20.sp,
+                        color: isAlarmPlaying
+                            ? Colors.red.withOpacity(0.9)
+                            : Colors.white.withOpacity(0.7),
+                        size: 20 * scaleFactor,
                       ),
-                      SizedBox(width: 12.w),
+                      SizedBox(width: 8 * scaleFactor),
                       Text(
-                        AudioService.isAlarmPlaying()
-                            ? 'Stop Alarm'
-                            : 'Skip Phase',
+                        isAlarmPlaying ? 'Stop Alarm' : 'Skip Phase',
                         style: TextStyle(
-                          fontSize: 14.sp,
+                          fontSize: 14 * scaleFactor,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.7),
-                          letterSpacing: 0.3.w,
+                          color: isAlarmPlaying
+                              ? Colors.red.withOpacity(0.9)
+                              : Colors.white.withOpacity(0.7),
+                          letterSpacing: 0.3 * scaleFactor,
                         ),
                       ),
                     ],

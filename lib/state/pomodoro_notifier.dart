@@ -5,6 +5,9 @@ import '../services/notification_service.dart';
 import '../services/audio_service.dart';
 import '../state/settings_notifier.dart';
 
+// Provider to track alarm state for UI updates
+final alarmStateProvider = StateProvider<bool>((ref) => false);
+
 class PomodoroNotifier extends StateNotifier<PomodoroState> {
   Timer? _timer;
   final Ref ref;
@@ -140,12 +143,28 @@ class PomodoroNotifier extends StateNotifier<PomodoroState> {
 
     print('🚨 TIMER ENDED - Playing alarm sound now!');
 
+    // Update UI to show alarm is playing
+    try {
+      ref.read(alarmStateProvider.notifier).state = true;
+    } catch (e) {
+      print('Warning: Could not update alarm state provider: $e');
+    }
+
     // Play alarm sound ALWAYS (regardless of app state)
     await AudioService.playAlarmSound();
 
+    // Auto-reset alarm state after 10 seconds
+    Future.delayed(const Duration(seconds: 10), () {
+      try {
+        ref.read(alarmStateProvider.notifier).state = false;
+      } catch (e) {
+        print('Warning: Could not reset alarm state provider: $e');
+      }
+    });
+
     print('🚨 Alarm sound call completed');
 
-    // Send notification only if app is in background
+    // Send notification ALWAYS (will only show if app is in background)
     NotificationService.scheduleNotification(title, body, 0);
   }
 

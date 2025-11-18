@@ -14,6 +14,14 @@ void main() async {
   await NotificationService.initializeNotifications();
   await AudioService.initialize();
 
+  // Debug: Test audio service after initialization
+  if (kDebugMode) {
+    print('🔧 DEBUG: Testing audio service in 3 seconds...');
+    Future.delayed(const Duration(seconds: 3), () {
+      AudioService.testAlarm();
+    });
+  }
+
   // Lock the app to portrait orientation only
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

@@ -1,18 +1,30 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:alarm/alarm.dart';
+import 'package:just_audio/just_audio.dart';
 
 class AudioService {
-  static const int alarmId = 42; // Unique ID for our alarm
-  static bool _isPlaying = false; // Track if alarm is currently playing
-  static bool _shouldStop = false; // Flag to stop the alarm
+  static AudioPlayer? _audioPlayer;
+  static bool _isPlaying = false;
+  static bool _shouldStop = false;
 
-  // Initialize the audio service with alarm package
+  // Initialize the audio service
   static Future<void> initialize() async {
     try {
-      await Alarm.init();
+      // Dispose any existing player first
+      if (_audioPlayer != null) {
+        try {
+          await _audioPlayer!.dispose();
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error disposing existing player during init: $e');
+          }
+        }
+      }
+
+      // Create fresh audio player
+      _audioPlayer = AudioPlayer();
       if (kDebugMode) {
-        print('🔊 Audio service with Alarm package initialized successfully');
+        print('🔊 Audio service with just_audio initialized successfully');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -21,44 +33,74 @@ class AudioService {
     }
   }
 
-  // Play alarm sound when timer ends using the alarm package
+  // Play alarm sound when timer ends using just_audio
   static Future<void> playAlarmSound() async {
     try {
-      // Stop any existing alarm first
+      // Stop and dispose any existing player first
       await stopAlarmSound();
+
+      // Dispose the old player completely to avoid conflicts
+      if (_audioPlayer != null) {
+        try {
+          await _audioPlayer!.dispose();
+          _audioPlayer = null;
+          if (kDebugMode) {
+            print('🔄 Disposed old audio player');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error disposing old player: $e');
+          }
+        }
+      }
+
+      // Create a fresh audio player
+      try {
+        _audioPlayer = AudioPlayer();
+        if (kDebugMode) {
+          print('✅ Created new audio player');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('❌ Failed to create new audio player: $e');
+          print('⚠️ Falling back to system sounds...');
+        }
+        await _fallbackAlarm();
+        return;
+      }
 
       _isPlaying = true;
       _shouldStop = false;
 
       if (kDebugMode) {
-        print('🚨 Starting ALARM package alarm sound...');
+        print('🚨 Starting alarm sound with fresh just_audio player...');
       }
 
-      // Create alarm settings using built-in alarm sound from the alarm package
-      final alarmSettings = AlarmSettings(
-        id: alarmId,
-        dateTime: DateTime.now().add(
-          const Duration(milliseconds: 100),
-        ), // Start almost immediately
-        assetAudioPath:
-            'assets/sounds/alarm.wav', // Use the WAV file you provided
-        loopAudio: true, // Loop the alarm
-        vibrate: true,
-        volume: 1.0, // Maximum volume
-        fadeDuration: 0.0, // No fade, immediate start
-        notificationTitle: 'Pomodoro Timer',
-        notificationBody: 'Timer finished! 🍅',
-        enableNotificationOnKill: false,
-      );
+      if (_audioPlayer != null) {
+        try {
+          // Load and play the alarm sound
+          await _audioPlayer!.setAsset('assets/sounds/alarm.wav');
+          await _audioPlayer!.setVolume(1.0);
+          await _audioPlayer!.setLoopMode(LoopMode.one); // Loop the sound
 
-      // Set the alarm
-      bool success = await Alarm.set(alarmSettings: alarmSettings);
+          // Play with vibration
+          await HapticFeedback.vibrate();
+          await _audioPlayer!.play();
 
-      if (success && kDebugMode) {
-        print('🚨 ALARM package alarm started successfully');
+          if (kDebugMode) {
+            print('🚨 Alarm sound started successfully with just_audio');
+          }
+        } catch (audioError) {
+          if (kDebugMode) {
+            print('❌ just_audio asset loading error: $audioError');
+            print('⚠️ Falling back to system sounds...');
+          }
+          await _fallbackAlarm();
+          return;
+        }
       } else {
         if (kDebugMode) {
-          print('⚠️ ALARM package failed, using fallback');
+          print('⚠️ Audio player not initialized, using fallback');
         }
         await _fallbackAlarm();
         return;
@@ -70,20 +112,28 @@ class AudioService {
       });
     } catch (e) {
       if (kDebugMode) {
-        print('❌ ALARM package error: $e');
+        print('❌ General alarm error: $e');
       }
-      // Fallback to aggressive system sound alarm
+      // Fallback to system sound alarm
       await _fallbackAlarm();
     }
   }
 
   // Stop the alarm sound
-  static Future<void> stopAlarmSound() async {
+  static Future<void> stopAlarmSound({Function()? onStop}) async {
     try {
       _shouldStop = true;
       _isPlaying = false;
 
-      await Alarm.stop(alarmId);
+      if (_audioPlayer != null) {
+        await _audioPlayer!.stop();
+      }
+
+      // Call the callback to update UI state if provided
+      if (onStop != null) {
+        onStop();
+      }
+
       if (kDebugMode) {
         print('🔇 Alarm sound stopped');
       }
@@ -97,22 +147,31 @@ class AudioService {
   // Fallback alarm using system sounds and vibration
   static Future<void> _fallbackAlarm() async {
     try {
+      _isPlaying = true;
       if (kDebugMode) {
         print('🔄 Using ENHANCED fallback alarm method');
       }
 
-      // Much more controlled fallback alarm with stop mechanism
-      for (int cycle = 0; cycle < 3 && !_shouldStop; cycle++) {
-        // Moderate alarm pattern - not as aggressive
-        for (int i = 0; i < 5 && !_shouldStop; i++) {
-          await SystemSound.play(SystemSoundType.alert);
-          await HapticFeedback.heavyImpact();
-          await Future.delayed(const Duration(milliseconds: 400));
-        }
+      // Enhanced fallback alarm with multiple notification types
+      for (int cycle = 0; cycle < 5 && !_shouldStop; cycle++) {
+        // Strong vibration pattern
+        await HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 100));
 
-        // Brief pause between cycles
-        if (cycle < 2 && !_shouldStop) {
-          await Future.delayed(const Duration(milliseconds: 800));
+        // System alert sound
+        await SystemSound.play(SystemSoundType.alert);
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        // Additional vibration
+        await HapticFeedback.mediumImpact();
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // Another system sound for emphasis
+        await SystemSound.play(SystemSoundType.click);
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        if (kDebugMode) {
+          print('🔊 Fallback alarm cycle $cycle completed');
         }
       }
 
@@ -144,21 +203,41 @@ class AudioService {
 
   // Check if alarm is currently playing
   static bool isAlarmPlaying() {
-    return _isPlaying || Alarm.hasAlarm();
+    return _isPlaying;
   }
 
-  // Get all active alarms
-  static List<AlarmSettings> getActiveAlarms() {
-    return Alarm.getAlarms();
+  // Static getter for reactive updates
+  static bool get isPlaying => _isPlaying;
+
+  // Get all active alarms (not used with just_audio)
+  static List<String> getActiveAlarms() {
+    return [];
   }
 
   // Dispose audio resources
   static Future<void> dispose() async {
     try {
-      // Stop any active alarms
-      await Alarm.stopAll();
+      // Set flags to stop any ongoing operations
+      _shouldStop = true;
+      _isPlaying = false;
+
+      // Stop and dispose audio player
+      if (_audioPlayer != null) {
+        try {
+          await _audioPlayer!.stop();
+          await _audioPlayer!.dispose();
+          _audioPlayer = null;
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error during audio player disposal: $e');
+          }
+        }
+      }
+
       if (kDebugMode) {
-        print('🔊 Audio service disposed - all alarms stopped');
+        print(
+          '🔊 Audio service disposed - audio player stopped and cleaned up',
+        );
       }
     } catch (e) {
       if (kDebugMode) {

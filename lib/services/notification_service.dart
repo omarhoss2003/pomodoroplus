@@ -50,8 +50,96 @@ class NotificationService {
       },
     );
 
+    // Create notification channel for Android
+    await _createNotificationChannel();
+
     // Request permissions for Android 13+
     await _requestPermissions();
+
+    // Debug: Test notification on startup
+    if (kDebugMode) {
+      print('🔧 DEBUG: Notification service initialized, testing...');
+      // Delay test notification to ensure everything is set up
+      Future.delayed(const Duration(seconds: 2), () async {
+        await testNotification();
+      });
+    }
+  }
+
+  // Create notification channel for Android
+  static Future<void> _createNotificationChannel() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          _notificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidImplementation != null) {
+        // Create the main pomodoro channel
+        await androidImplementation.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'pomodoro_channel',
+            'Pomodoro Notifications',
+            description: 'Notifications for Pomodoro timer phase completions',
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+            showBadge: true,
+          ),
+        );
+
+        // Create test channel
+        await androidImplementation.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'test_channel',
+            'Test Notifications',
+            description: 'Test notification channel',
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
+
+        if (kDebugMode) {
+          print('✅ Notification channels created successfully');
+        }
+      }
+    }
+  }
+
+  // Test notification function for debugging
+  static Future<void> testNotification() async {
+    try {
+      if (kDebugMode) {
+        print('🧪 Testing notification system...');
+      }
+
+      await _notificationsPlugin.show(
+        999, // test ID
+        'Test Notification',
+        'If you see this, notifications are working!',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Test Notifications',
+            channelDescription: 'Test notification channel',
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        ),
+      );
+
+      if (kDebugMode) {
+        print('✅ Test notification sent successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Test notification failed: $e');
+      }
+    }
   }
 
   static Future<void> _requestPermissions() async {
@@ -71,6 +159,12 @@ class NotificationService {
     String body,
     int seconds,
   ) async {
+    if (kDebugMode) {
+      print('🔍 DEBUG: App lifecycle state: $_appLifecycleState');
+      print('🔍 DEBUG: isAppInBackground: $isAppInBackground');
+      print('🔍 DEBUG: Attempting to show notification: $title - $body');
+    }
+
     // Only show notifications if app is in background
     if (!isAppInBackground) {
       if (kDebugMode) {
@@ -82,6 +176,7 @@ class NotificationService {
     if (kDebugMode) {
       print('📱 App is in background, showing notification: $title - $body');
     }
+
     // Android notification details
     const AndroidNotificationDetails androidNotificationDetails =
         AndroidNotificationDetails(
@@ -93,6 +188,10 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           icon: '@mipmap/ic_launcher',
+          fullScreenIntent:
+              true, // Allow notification to show with full visibility
+          autoCancel: false, // Don't auto dismiss
+          ongoing: false, // Not a persistent notification
         );
 
     // iOS notification details
@@ -109,22 +208,22 @@ class NotificationService {
       iOS: iosNotificationDetails,
     );
 
-    // Schedule or show immediately
-    if (seconds <= 0) {
+    // Show notification immediately for timer completion
+    try {
       await _notificationsPlugin.show(
-        0, // notification id
+        DateTime.now().millisecondsSinceEpoch ~/
+            1000, // unique ID based on timestamp
         title,
         body,
         notificationDetails,
       );
-    } else {
-      // For immediate notifications, just show it
-      await _notificationsPlugin.show(
-        0, // notification id
-        title,
-        body,
-        notificationDetails,
-      );
+      if (kDebugMode) {
+        print('✅ Notification shown successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Failed to show notification: $e');
+      }
     }
   }
 
